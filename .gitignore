@@ -3,9 +3,13 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+README.md
+.travis.yml
+README.md
+platformio.ini
+.vscode/extensions.json
 include/README
 lib/README
 test/README
-platformio.ini
-.vscode/extensions.json
-
+README.md
+README.md
