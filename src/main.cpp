@@ -3,6 +3,10 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
+#define LAMP_PIN 2
+#define POMP_PIN 2
+#define BUTT_PIN 0
+
 OneButton button(0, true);
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -11,7 +15,14 @@ const char* ssid = "ERRS"; // Название WIFI
 const char* password = "enes5152"; // Код от WIFI
 const char* mqtt_server = "192.168.1.112"; // IP mqtt сервера
 
-bool water;
+unsigned long timer;
+
+bool flag_water;
+
+int timer_water = 60;
+bool flag_day1;
+bool flag_day2;
+bool flag_day3;
 
 
 
@@ -66,18 +77,11 @@ void reconnect() { // Если мы потеряли подключение то
 
 
 void topicSub(){ // Подписываемся на топики
-  client.subscribe("water");
-}
-
-
-
-void click(){
-  digitalWrite(2, HIGH);
-}
-
-
-void startPress(){
-  digitalWrite(2, LOW);
+  client.subscribe("water/now");
+  client.subscribe("water/day1");
+  client.subscribe("water/day2");
+  client.subscribe("water/day3");
+  client.subscribe("water/time");
 }
 
 
@@ -99,28 +103,104 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
   Serial.println();
 
 
-  if(strTopic == "water"){
+  if(strTopic == "water/now"){
     if(strPayload == "on"){
-      water = true;
+      flag_water = true;
     }
     else if(strPayload == "off"){
-      water = false;
+      flag_water = false;
+    }
+  }
+  
+  if(strTopic == "water/time"){
+    timer_water = strPayload.toInt();
+  }
+
+  if(strTopic == "water/day1"){
+
+    if(strPayload == "on") {
+      flag_day1 = true;
+      delay(500);
+      digitalWrite(LAMP_PIN, HIGH);
+      delay(100);
+      digitalWrite(LAMP_PIN, LOW);
+    }
+    else{
+      flag_day1 = false;
+    }
+  }
+
+  if(strTopic == "water/day2"){
+
+    if(strPayload == "on") {
+      flag_day2 = true;
+      delay(500);
+      digitalWrite(LAMP_PIN, HIGH);
+      delay(100);
+      digitalWrite(LAMP_PIN, LOW);
+
+      delay(500);
+      digitalWrite(LAMP_PIN, HIGH);
+      delay(100);
+      digitalWrite(LAMP_PIN, LOW);
+    }
+    else{
+      flag_day2 = false;
+    }
+  }
+
+  if(strTopic == "water/day3"){
+
+
+    if(strPayload == "on") {
+      flag_day3 = true;
+      delay(500);
+      digitalWrite(LAMP_PIN, HIGH);
+      delay(100);
+      digitalWrite(LAMP_PIN, LOW);
+
+      delay(500);
+      digitalWrite(LAMP_PIN, HIGH);
+      delay(100);
+      digitalWrite(LAMP_PIN, LOW);
+
+      delay(500);
+      digitalWrite(LAMP_PIN, HIGH);
+      delay(100);
+      digitalWrite(LAMP_PIN, LOW);
+    }
+    else{
+      flag_day3 = false;
     }
   }
 
 }
 
 
+
+void startPress(){
+  flag_water = true;
+}
+
+void stopPress(){
+  flag_water = false;
+}
+
+
+
 void setup() {
-  pinMode(2, OUTPUT);
+  pinMode(POMP_PIN, OUTPUT);
+  pinMode(LAMP_PIN, OUTPUT);
   
   setupWifi();
   client.setServer(mqtt_server, 1883);
 
-  button.attachClick(click);
+  button.attachLongPressStop(stopPress);
   button.attachLongPressStart(startPress);
-  digitalWrite(2, LOW);
+  digitalWrite(POMP_PIN, LOW);
 }
+
+
 
 void loop() {
   if (!client.connected()){ // Если потеряли подключение
@@ -131,12 +211,40 @@ void loop() {
 
   button.tick();
 
-  if(water){
-    digitalWrite(2, HIGH);
+  if(flag_water){
+    if(millis() - timer > timer_water * 1000){
+      timer = millis();
+      flag_water = false;
+    }
+    digitalWrite(POMP_PIN, HIGH);
+    digitalWrite(LAMP_PIN, HIGH);
   }
   else{
-    digitalWrite(2, LOW);
+    digitalWrite(POMP_PIN, LOW);
+    digitalWrite(LAMP_PIN, LOW);
   }
+
+
+
+  if(flag_day1 && !flag_water){
+    if(millis() - timer > 10*1000){
+      timer = millis();
+      flag_water= true;
+    }
+  }
+  else if(flag_day2 && !flag_water){
+    if(millis() - timer > 24*60*60*1000){
+      timer = millis();
+      flag_water= true;
+    }
+  }
+  else if(flag_day2 && !flag_water){
+    if(millis() - timer > 24*60*60*1000){
+      timer = millis();
+      flag_water= true;
+    }
+  }
+
 
 
   client.loop();
