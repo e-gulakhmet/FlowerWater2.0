@@ -19,10 +19,12 @@ unsigned long timer;
 
 bool flag_water;
 
-int timer_water = 60;
+byte timer_water = 60;
 bool flag_day1;
 bool flag_day2;
 bool flag_day3;
+
+String strTimer;
 
 
 
@@ -123,14 +125,6 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
     else if(strPayload == "off"){
       flag_water = false;
     }
-    else if(strPayload == "update"){
-      if(flag_water){
-      client.publish("water/now", "on");
-      }
-      else if(!flag_water){
-      client.publish("water/now", "off");
-      }
-    }
   }
   
   if(strTopic == "water/time"){ // Как долго происходит полив
@@ -140,12 +134,14 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
   if(strTopic == "water/day1"){ // Раз в день
     if(strPayload == "on") {
       flag_day1 = true;
+      flag_day2 = false;
+      flag_day3 = false;
       delay(500);
       digitalWrite(LAMP_PIN, HIGH);
       delay(100);
       digitalWrite(LAMP_PIN, LOW);
     }
-    else{
+    else if(strPayload == "off"){
       flag_day1 = false;
     }
   }
@@ -153,6 +149,8 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
   if(strTopic == "water/day2"){ // Раз в два дня
     if(strPayload == "on") {
       flag_day2 = true;
+      flag_day1 = false;
+      flag_day3 = false;
       delay(500);
       digitalWrite(LAMP_PIN, HIGH);
       delay(100);
@@ -171,6 +169,8 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
   if(strTopic == "water/day3"){ // Раз в три дня
     if(strPayload == "on") {
       flag_day3 = true;
+      flag_day1 = false;
+      flag_day2 = false;
       delay(500);
       digitalWrite(LAMP_PIN, HIGH);
       delay(100);
@@ -193,6 +193,47 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
 
 
 
+
+  if(strTopic == "water/info"){
+    if(strPayload == "update"){
+      if(flag_water){
+        client.publish("water/info/now", "on");
+      }
+      else if(!flag_water){
+        client.publish("water/info/now", "off");
+      }
+      delay(500);
+      
+      if(flag_day1){
+        client.publish("water/info/day1", "on");
+      }
+      else if(!flag_day1){
+        client.publish("water/info/day1", "off");
+      }
+      delay(500);
+
+      if(flag_day2){
+        client.publish("water/info/day2", "on");
+      }
+      else if(!flag_day2){
+        client.publish("water/info/day2", "off");
+      }
+      delay(500);
+
+      if(flag_day3){
+        client.publish("water/info/day3", "on");
+      }
+      else if(!flag_day3){
+        client.publish("water/info/day3", "off");
+      }
+      delay(500);
+
+      client.publish("water/info/time", strTimer);
+    }
+  }
+
+
+
 }
 
 
@@ -201,24 +242,24 @@ void click(){
   if(flag_day1){ // Изменение с помощью кнопки
     flag_day1 = false;
     flag_day2 = true;
-    showInfo(1);
+    showInfo(2);
   }
   else if(flag_day2){
     flag_day1 = false;
     flag_day2 = false;
     flag_day3 = true;
-    showInfo(2);
+    showInfo(3);
   }
   else if(flag_day3){
     flag_day2 = false;
     flag_day3 = false;
     flag_day1 = true;
-    showInfo(3);
+    showInfo(1);
   }
   else{
     flag_day1 = false;
     flag_day2 = true;
-    showInfo(1);
+    showInfo(2);
   }
 }
 
@@ -255,6 +296,8 @@ void loop() {
   }
 
   button.tick();
+
+  strTimer = String(50);
 
   if(flag_water){ // Если флаг активирован, то включаем помпу и следим за таймером отключения
     if(millis() - timer > timer_water * 1000){
