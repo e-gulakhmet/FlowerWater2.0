@@ -3,7 +3,7 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#define LAMP_PIN 2
+#define LAMP_PIN 1
 #define POMP_PIN 2
 #define BUTT_PIN 0
 
@@ -23,6 +23,17 @@ int timer_water = 60;
 bool flag_day1;
 bool flag_day2;
 bool flag_day3;
+
+
+
+void showInfo(int count){
+  for(int i = 0; i < count; i++){
+      delay(500);
+      digitalWrite(LAMP_PIN, HIGH);
+      delay(100);
+      digitalWrite(LAMP_PIN, LOW);
+  }
+}
 
 
 
@@ -82,6 +93,8 @@ void topicSub(){ // Подписываемся на топики
   client.subscribe("water/day2");
   client.subscribe("water/day3");
   client.subscribe("water/time");
+  client.subscribe("water/time");
+  client.subscribe("water/info");
 }
 
 
@@ -103,21 +116,28 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
   Serial.println();
 
 
-  if(strTopic == "water/now"){
+  if(strTopic == "water/now"){ // Полив по нажатию кнопку на телефоне 
     if(strPayload == "on"){
       flag_water = true;
     }
     else if(strPayload == "off"){
       flag_water = false;
     }
+    else if(strPayload == "update"){
+      if(flag_water){
+      client.publish("water/now", "on");
+      }
+      else if(!flag_water){
+      client.publish("water/now", "off");
+      }
+    }
   }
   
-  if(strTopic == "water/time"){
+  if(strTopic == "water/time"){ // Как долго происходит полив
     timer_water = strPayload.toInt();
   }
 
-  if(strTopic == "water/day1"){
-
+  if(strTopic == "water/day1"){ // Раз в день
     if(strPayload == "on") {
       flag_day1 = true;
       delay(500);
@@ -130,8 +150,7 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
     }
   }
 
-  if(strTopic == "water/day2"){
-
+  if(strTopic == "water/day2"){ // Раз в два дня
     if(strPayload == "on") {
       flag_day2 = true;
       delay(500);
@@ -149,9 +168,7 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
     }
   }
 
-  if(strTopic == "water/day3"){
-
-
+  if(strTopic == "water/day3"){ // Раз в три дня
     if(strPayload == "on") {
       flag_day3 = true;
       delay(500);
@@ -174,9 +191,36 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
     }
   }
 
+
+
 }
 
 
+
+void click(){
+  if(flag_day1){ // Изменение с помощью кнопки
+    flag_day1 = false;
+    flag_day2 = true;
+    showInfo(1);
+  }
+  else if(flag_day2){
+    flag_day1 = false;
+    flag_day2 = false;
+    flag_day3 = true;
+    showInfo(2);
+  }
+  else if(flag_day3){
+    flag_day2 = false;
+    flag_day3 = false;
+    flag_day1 = true;
+    showInfo(3);
+  }
+  else{
+    flag_day1 = false;
+    flag_day2 = true;
+    showInfo(1);
+  }
+}
 
 void startPress(){
   flag_water = true;
@@ -195,6 +239,7 @@ void setup() {
   setupWifi();
   client.setServer(mqtt_server, 1883);
 
+  button.attachClick(click);
   button.attachLongPressStop(stopPress);
   button.attachLongPressStart(startPress);
   digitalWrite(POMP_PIN, LOW);
@@ -211,7 +256,7 @@ void loop() {
 
   button.tick();
 
-  if(flag_water){
+  if(flag_water){ // Если флаг активирован, то включаем помпу и следим за таймером отключения
     if(millis() - timer > timer_water * 1000){
       timer = millis();
       flag_water = false;
@@ -225,26 +270,25 @@ void loop() {
   }
 
 
-
-  if(flag_day1 && !flag_water){
+  // Включение полива по большому таймеру
+  if(flag_day1 && !flag_water){ 
     if(millis() - timer > 10*1000){
       timer = millis();
       flag_water= true;
     }
   }
   else if(flag_day2 && !flag_water){
-    if(millis() - timer > 24*60*60*1000){
+    if(millis() - timer > 2*24*60*60*1000){
       timer = millis();
       flag_water= true;
     }
   }
   else if(flag_day2 && !flag_water){
-    if(millis() - timer > 24*60*60*1000){
+    if(millis() - timer > 3*24*60*60*1000){
       timer = millis();
       flag_water= true;
     }
   }
-
 
 
   client.loop();
