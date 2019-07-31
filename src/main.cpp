@@ -19,12 +19,13 @@ unsigned long timer;
 
 bool flag_water;
 
-byte timer_water = 60;
+int int_timer_water = 60;
 bool flag_day1;
 bool flag_day2;
 bool flag_day3;
 
-String strTimer;
+String str_timer_water;
+char char_timer_water[3];
 
 
 
@@ -128,7 +129,7 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
   }
   
   if(strTopic == "water/time"){ // Как долго происходит полив
-    timer_water = strPayload.toInt();
+    int_timer_water = strPayload.toInt();
   }
 
   if(strTopic == "water/day1"){ // Раз в день
@@ -228,7 +229,7 @@ void callback(char* topic, byte* payload, unsigned int length) { // Функци
       }
       delay(500);
 
-      client.publish("water/info/time", strTimer);
+      client.publish("water/info/time", char_timer_water);
     }
   }
 
@@ -297,10 +298,11 @@ void loop() {
 
   button.tick();
 
-  strTimer = String(50);
+  str_timer_water = (String)int_timer_water;
+  str_timer_water.toCharArray(char_timer_water, 3);
 
   if(flag_water){ // Если флаг активирован, то включаем помпу и следим за таймером отключения
-    if(millis() - timer > timer_water * 1000){
+    if(millis() - timer > int_timer_water * 1000){
       timer = millis();
       flag_water = false;
     }
