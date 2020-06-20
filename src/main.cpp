@@ -3,18 +3,12 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#define LAMP_PIN 1
-#define POMP_PIN 2
-#define BUTT_PIN 0
+#include "main.hpp"
 
 OneButton button(0, true);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-const char* ssid = "ERRS"; // Название WIFI
-const char* password = "enes5152"; // Код от WIFI
-const char* mqtt_server = "192.168.1.112"; // IP mqtt сервера
-const char* name = "flower_water";
 
 String topics[] = {"water/info", "water/state", "water/period/off", "water/period/on"};
 
@@ -24,10 +18,6 @@ bool is_watering;
 
 uint period_time = 3*24*60*60;
 uint watering_time = 60;
-
-
-
-// TODO: Добавить настройку времени, после которого происходит полив
 
 
 
