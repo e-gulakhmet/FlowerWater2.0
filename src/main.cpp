@@ -2,6 +2,9 @@
 #include <OneButton.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
+#include "WiFiUdp.h"
+#include "ArduinoOTA.h"
+#include <bits/stdc++.h>
 
 #include "main.hpp"
 
@@ -14,7 +17,7 @@ String topics[] = {"water/info", "water/state", "water/period/off", "water/perio
 
 unsigned long period_timer;
 
-bool is_watering;
+bool is_watering = true;
 
 uint period_time = 3*24*60*60;
 uint watering_time = 60;
@@ -25,14 +28,6 @@ char* convertIntToChar(int value) {
   String str_value = (String)value;
   char char_value[str_value.length()];
   str_value.toCharArray(char_value, str_value.length());
-
-  return char_value;
-}
-
-
-char* convertStrToChar(String value) {
-  char char_value[value.length()];
-  value.toCharArray(char_value, value.length());
 
   return char_value;
 }
@@ -70,14 +65,12 @@ void callBack(char* topic, byte* payload, unsigned int length) { // Функци
 
   if (strTopic == topics[0]){
     if (strPayload == "update"){
-      client.publish(convertStrToChar(topics[1]), is_watering ? "on" : "off");
-      delay(500);
-      client.publish(convertStrToChar(topics[2]), convertIntToChar(period_time));
-      client.publish(convertStrToChar(topics[3]), convertIntToChar(watering_time));
+      client.publish(topics[1].c_str(), is_watering ? "on" : "off");
+      client.publish(topics[2].c_str(), convertIntToChar(period_time));
+      client.publish(topics[3].c_str(), convertIntToChar(watering_time));
     }
   }
 }
-
 
 
 
@@ -86,10 +79,8 @@ void connect() {
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     if (client.connect(name)) {
-      for (int i = 0; i < (int)sizeof(topics); i++) {
-        char topic[topics[i].length()];
-        topics[i].toCharArray(topic, topics[i].length());
-        client.subscribe(topic);
+      for (int i = 0; i < 4; i++) {
+        client.subscribe(topics[i].c_str());
       }
       client.setCallback(callBack);
       Serial.println("connected");
@@ -102,6 +93,30 @@ void connect() {
     }
   }
 }
+
+// void connect() { // Если мы потеряли подключение то включаем перезагрузку
+//   // Loop until we're reconnected
+//   while(!client.connected()) {
+//     Serial.print("Attempting MQTT connection...");
+//     // Create a random client ID
+//     String clientId = "ESP8266Client-";
+//     clientId += String(random(0xffff), HEX);
+//     // Attempt to connect
+//     if (client.connect(clientId.c_str())) {
+//       Serial.println("connected");
+//       // Once connected, publish an announcement...
+//       client.publish("outTopic", "hello world");
+//       // ... and resubscribe
+//       client.subscribe("inTopic");
+//     } else {
+//       Serial.print("failed, rc=");
+//       Serial.print(client.state());
+//       Serial.println(" try again in 5 seconds");
+//       // Wait 5 seconds before retrying
+//       delay(5000);
+//     }
+//   }
+// }
 
 
 
@@ -124,18 +139,51 @@ void initWifi(){ // Настройка WIFI
   Serial.println("IP address: ");
   Serial.println(WiFi.localIP());
 }
+// void initWifi(){ // Настройка WIFI
+//   delay(10);
+//   // We start by connecting to a WiFi network
+//   Serial.println();
+//   Serial.print("Connecting to ");
+//   Serial.println(ssid);
+
+//   WiFi.begin(ssid, password);
+
+//   while (WiFi.status() != WL_CONNECTED) {
+//     delay(500);
+//     Serial.print('.');
+//   }
+
+//   randomSeed(micros());
+
+//   Serial.println("");
+//   Serial.println("WiFi connected");
+//   Serial.println("IP address: ");
+//   Serial.println(WiFi.localIP());
+// }
+
+
+
+
+void initWifiUpd() {
+  ArduinoOTA.setHostname("FLOWER-WATER"); // Задаем имя сетевого порта
+  //ArduinoOTA.setPassword((const char *)"0000"); // Задаем пароль доступа для удаленной прошивки
+  ArduinoOTA.begin(); // Инициализируем OTA
+}
 
 
 
 void setup() {
-  pinMode(POMP_PIN, OUTPUT);
-  pinMode(LAMP_PIN, OUTPUT);
+  Serial.begin(9600);
+
+  //pinMode(POMP_PIN, OUTPUT);
+  //pinMode(LAMP_PIN, OUTPUT);
+  // digitalWrite(POMP_PIN, LOW);
   
   initWifi();
   delay(100);
   connect();
-
-  digitalWrite(POMP_PIN, LOW);
+  
+  initWifiUpd();
 }
 
 
@@ -148,7 +196,12 @@ void loop() {
 
   client.loop();
 
+  ArduinoOTA.handle(); // Всегда готовы к прошивке
 
+
+  // for (int i = 0; i < sizeof(topics); i++) {
+  //   Serial.println(convertStrToChar(topics[i]));
+  // }
 
   if (is_watering){ // Если флаг активирован, то включаем помпу и следим за таймером отключения
     static unsigned long timer;
