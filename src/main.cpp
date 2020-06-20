@@ -16,20 +16,36 @@ const char* password = "enes5152"; // Код от WIFI
 const char* mqtt_server = "192.168.1.112"; // IP mqtt сервера
 const char* name = "flower_water";
 
-String topics[] = {"water/now", "water/time", "water/info"};
+String topics[] = {"water/info", "water/state", "water/period/off", "water/period/on"};
 
-unsigned long timer;
+unsigned long period_timer;
 
-bool flag_water;
+bool is_watering;
 
-int int_timer_water = 60;
-
-String str_timer_water;
-char char_timer_water[3];
+uint period_time = 3*24*60*60;
+uint watering_time = 60;
 
 
 
 // TODO: Добавить настройку времени, после которого происходит полив
+
+
+
+char* convertIntToChar(int value) {
+  String str_value = (String)value;
+  char char_value[str_value.length()];
+  str_value.toCharArray(char_value, str_value.length());
+
+  return char_value;
+}
+
+
+char* convertStrToChar(String value) {
+  char char_value[value.length()];
+  value.toCharArray(char_value, value.length());
+
+  return char_value;
+}
 
 
 
@@ -43,37 +59,31 @@ void callBack(char* topic, byte* payload, unsigned int length) { // Функци
   String strPayload = ""; // Создаем пустую строку, которая будет хранить весь payload
 
 
-  for (int i = 0; i < length; i++) {
+  for (uint i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
     strPayload = strPayload + ((char)payload[i]); // присваеваем значение по столбикам, чтобы получить всю строку
   }
   Serial.println();
 
 
-  if (strTopic == "water/now"){ // Полив по команде
-    if (strPayload == "on"){
-      flag_water = true;
-    }
-    else if (strPayload == "off"){
-      flag_water = false;
-    }
+  if (strTopic == topics[0]){ // Полив по команде
+    is_watering = strPayload == "on" ? true : false;
+  }
+
+  if (strTopic == topics[2]) { // Время покая
+    period_time = strPayload.toInt();
   }
   
-  if (strTopic == "water/time"){ // Как долго происходит полив
-    int_timer_water = strPayload.toInt();
+  if (strTopic == topics[3]){ // Как долго происходит полив
+    watering_time = strPayload.toInt();
   }
 
-  if (strTopic == "water/info"){
+  if (strTopic == topics[0]){
     if (strPayload == "update"){
-      if (flag_water){
-        client.publish("water/info/now", "on");
-      }
-      else if (!flag_water){
-        client.publish("water/info/now", "off");
-      }
+      client.publish(convertStrToChar(topics[1]), is_watering ? "on" : "off");
       delay(500);
-
-      client.publish("water/info/time", char_timer_water);
+      client.publish(convertStrToChar(topics[2]), convertIntToChar(period_time));
+      client.publish(convertStrToChar(topics[3]), convertIntToChar(watering_time));
     }
   }
 }
@@ -126,20 +136,14 @@ void initWifi(){ // Настройка WIFI
 }
 
 
-void topicSub(){ // Подписываемся на топики
-  client.subscribe("water/now");
-  client.subscribe("water/time");
-  client.subscribe("water/info");
-}
-
-
 
 void setup() {
   pinMode(POMP_PIN, OUTPUT);
   pinMode(LAMP_PIN, OUTPUT);
   
   initWifi();
-  client.setServer(mqtt_server, 1883);
+  delay(100);
+  connect();
 
   digitalWrite(POMP_PIN, LOW);
 }
@@ -154,13 +158,13 @@ void loop() {
 
   client.loop();
 
-  str_timer_water = (String)int_timer_water;
-  str_timer_water.toCharArray(char_timer_water, 3);
 
-  if (flag_water){ // Если флаг активирован, то включаем помпу и следим за таймером отключения
-    if (millis() - timer > int_timer_water * 1000){
+
+  if (is_watering){ // Если флаг активирован, то включаем помпу и следим за таймером отключения
+    static unsigned long timer;
+    if (millis() - timer > watering_time * 1000){
       timer = millis();
-      flag_water = false;
+      is_watering = false;
     }
     digitalWrite(POMP_PIN, HIGH);
     digitalWrite(LAMP_PIN, HIGH);
@@ -172,10 +176,10 @@ void loop() {
 
 
   // Включение полива по большому таймеру
-  if (!flag_water) { 
-    if (millis() - timer > 10*1000) {
-      timer = millis();
-      flag_water= true;
+  if (!is_watering) { 
+    if (millis() - period_timer > period_time) {
+      period_timer = millis();
+      is_watering= true;
     }
   }
 }
