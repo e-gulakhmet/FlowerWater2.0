@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <OneButton.h>
+#include <GyverButton.h>
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include "WiFiUdp.h"
@@ -8,27 +8,20 @@
 
 #include "main.hpp"
 
-OneButton button(0, true);
+GButton button(0);
 WiFiClient espClient;
 PubSubClient client(espClient);
 
 
 String topics[] = {"water/info", "water/state", "water/period/off", "water/period/on"};
 
-unsigned long period_timer;
+unsigned long timer;
 
 bool is_watering = true;
+bool is_auto = false;
 
 int period_time = 3*24*60*60;
 int watering_time = 60;
-
-
-
-const char* convertIntToChar(int value) {
-  String str_value = (String)value;
-
-  return str_value.c_str();
-}
 
 
 
@@ -46,7 +39,6 @@ void callBack(char* topic, byte* payload, unsigned int length) { // Функци
     Serial.print((char)payload[i]);
     strPayload = strPayload + ((char)payload[i]); // присваеваем значение по столбикам, чтобы получить всю строку
   }
-  Serial.println(strPayload);
   Serial.println();
 
 
@@ -66,9 +58,9 @@ void callBack(char* topic, byte* payload, unsigned int length) { // Функци
     if (strPayload == "update"){
       client.publish(topics[1].c_str(), is_watering ? "on" : "off");
       delay(100);
-      client.publish(topics[2].c_str(), convertIntToChar(period_time));
+      client.publish(topics[2].c_str(), String(period_time).c_str());
       delay(100);
-      client.publish(topics[3].c_str(), convertIntToChar(watering_time));
+      client.publish(topics[3].c_str(), String(watering_time).c_str());
     }
   }
 }
@@ -89,8 +81,7 @@ void connect() {
     }
     else {
       Serial.println(" try again in 5 seconds");
-      // Wait 5 seconds before retrying
-      delay(5000);
+      delay(3000);
     }
   }
 }
@@ -131,7 +122,6 @@ void setup() {
 
   //pinMode(POMP_PIN, OUTPUT);
   //pinMode(LAMP_PIN, OUTPUT);
-  // digitalWrite(POMP_PIN, LOW);
   
   initWifi();
   delay(100);
@@ -148,34 +138,41 @@ void loop() {
 
   button.tick();
 
-  // for (int i = 0; i < sizeof(topics); i++) {
-  //   Serial.println(convertStrToChar(topics[i]));
-  // }
-
-  if (is_watering){ // Если флаг активирован, то включаем помпу и следим за таймером отключения
-    static unsigned long timer;
-    if (millis() - timer > watering_time * 1000){
-      timer = millis();
-      is_watering = false;
-    }
-    digitalWrite(POMP_PIN, HIGH);
-    digitalWrite(LAMP_PIN, HIGH);
-  }
-  else {
-    digitalWrite(POMP_PIN, LOW);
-    digitalWrite(LAMP_PIN, LOW);
-  }
-
-
-  // Включение полива по большому таймеру
-  if (!is_watering) { 
-    if (millis() - period_timer > period_time) {
-      period_timer = millis();
-      is_watering= true;
-    }
-  }
-
   client.loop();
 
   ArduinoOTA.handle(); // Всегда готовы к прошивке
+
+  if (button.isHolded()) {
+    is_auto = is_auto ? false : true;
+  }
+
+  if (is_auto) {
+    if (is_watering){ // Если флаг активирован, то включаем помпу и следим за таймером отключения
+      if (millis() - timer > watering_time * 1000){
+        timer = millis();
+        is_watering = false;
+      }
+      digitalWrite(POMP_PIN, HIGH);
+      digitalWrite(LAMP_PIN, HIGH);
+    }
+    else {
+      // Включение полива по большому таймеру
+      if (millis() - timer > period_time) {
+        timer = millis();
+        is_watering= true;
+      }
+      digitalWrite(POMP_PIN, LOW);
+      digitalWrite(LAMP_PIN, LOW);
+    }
+  }
+  else {
+    if (button.isHold()) {
+      digitalWrite(POMP_PIN, HIGH);
+      digitalWrite(LAMP_PIN, HIGH);
+    }
+    if (button.isRelease()) {
+      digitalWrite(POMP_PIN, LOW);
+      digitalWrite(LAMP_PIN, LOW);      
+    }
+  }
 }
