@@ -4,7 +4,6 @@
 #include <PubSubClient.h>
 #include "WiFiUdp.h"
 #include "ArduinoOTA.h"
-#include <bits/stdc++.h>
 
 #include "main.hpp"
 
@@ -69,6 +68,7 @@ void callBack(char* topic, byte* payload, unsigned int length) { // Функци
 
 void connect() {
   client.setServer(mqtt_server, 1883);
+  delay(1000);
   while (!client.connected()) {
     Serial.print("Attempting MQTT connection...");
     if (client.connect(name)) {
@@ -80,7 +80,7 @@ void connect() {
       Serial.println('\n');
     }
     else {
-      Serial.println(" try again in 5 seconds");
+      Serial.println(" try again in 3 seconds");
       delay(3000);
     }
   }
@@ -120,8 +120,7 @@ void initWifiUpd() {
 void setup() {
   Serial.begin(9600);
 
-  //pinMode(POMP_PIN, OUTPUT);
-  //pinMode(LAMP_PIN, OUTPUT);
+  pinMode(POMP_PIN, OUTPUT);
   
   initWifi();
   delay(100);
