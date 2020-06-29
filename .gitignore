@@ -6,7 +6,6 @@
 README.md
 .travis.yml
 README.md
-platformio.ini
 .vscode/extensions.json
 include/README
 lib/README
